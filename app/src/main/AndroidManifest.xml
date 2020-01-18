@@ -29,7 +29,10 @@
              mark the app with "This app is optimized to run in full screen." -->
         <meta-data android:name="android.max_aspect" android:value="10.0" />
 
-        <activity android:name="com.pavelperc.ipynbViewer.MainActivity">
+        <activity
+            android:name="com.pavelperc.ipynbViewer.MainActivity"
+            android:configChanges="orientation|screenSize"
+            >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
