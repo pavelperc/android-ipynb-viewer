@@ -44,10 +44,10 @@ import java.util.zip.ZipInputStream;
  * <p/>
  * (5.2) For every other zip entry, extract it into $STAGING_PREFIX and set execute permissions if necessary.
  */
-final class TermuxInstaller {
+public final class TermuxInstaller {
 
     /** Performs setup if necessary. */
-    static void setupIfNeeded(final Activity activity, final Runnable whenDone) {
+    public static void setupIfNeeded(final Activity activity, final Runnable whenDone) {
         // Termux can only be run as the primary user (device owner) since only that
         // account has the expected file system paths. Verify that:
         UserManager um = (UserManager) activity.getSystemService(Context.USER_SERVICE);
