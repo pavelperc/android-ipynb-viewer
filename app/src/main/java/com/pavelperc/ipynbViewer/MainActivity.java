@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
-import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -14,71 +12,16 @@ import com.termux.app.BackgroundJob;
 import com.termux.app.TermuxActivity;
 import com.termux.app.TermuxInstaller;
 import com.termux.terminal.TerminalSession;
-import com.termux.view.TerminalView;
-import com.termux.view.TerminalViewClient;
 
 import java.io.File;
 
 import static com.termux.app.TermuxService.HOME_PATH;
 import static com.termux.app.TermuxService.PREFIX_PATH;
 
-class EmptyTerminalViewCallback implements TerminalViewClient {
-    
-    @Override
-    public float onScale(float scale) {
-        return 0;
-    }
-    
-    @Override
-    public void onSingleTapUp(MotionEvent e) {
-        
-    }
-    
-    @Override
-    public boolean shouldBackButtonBeMappedToEscape() {
-        return false;
-    }
-    
-    @Override
-    public void copyModeChanged(boolean copyMode) {
-        
-    }
-    
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession session) {
-        return false;
-    }
-    
-    @Override
-    public boolean onKeyUp(int keyCode, KeyEvent e) {
-        return false;
-    }
-    
-    @Override
-    public boolean readControlKey() {
-        return false;
-    }
-    
-    @Override
-    public boolean readAltKey() {
-        return false;
-    }
-    
-    @Override
-    public boolean onCodePoint(int codePoint, boolean ctrlDown, TerminalSession session) {
-        return false;
-    }
-    
-    @Override
-    public boolean onLongPress(MotionEvent event) {
-        return false;
-    }
-}
 
 public class MainActivity extends Activity implements TerminalSession.SessionChangedCallback {
     
     TerminalSession session;
-    TerminalView terminalView;
     TextView tvLog;
     
     @Override
@@ -86,18 +29,17 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
-        terminalView = findViewById(R.id.termLog);
         tvLog = findViewById(R.id.tvLog);
         tvLog.setMovementMethod(new ScrollingMovementMethod());
     
-        terminalView.setTextSize(12);
-        terminalView.setOnKeyListener(new EmptyTerminalViewCallback());
         
         
         TermuxInstaller.setupIfNeeded(this, () -> {
             session = createTermSession(null, null, null, false);
-            terminalView.attachSession(session);
+            session.updateSize(50, 10);
+            session.reset();
             
+            // ?????? not working
             session.write("echo hello\n");
             session.write("echo hello\n");
             session.write("echo hello\n");
@@ -171,8 +113,20 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
     public void onTextChanged(TerminalSession changedSession) {
         String text = changedSession.getEmulator().getScreen().getTranscriptText();
         tvLog.setText(text);
-        Toast.makeText(this, "Text changed", Toast.LENGTH_SHORT).show();
-        terminalView.onScreenUpdated();
+        
+        scrollLog();
+    }
+    
+    private void scrollLog() {
+        if (tvLog.getLayout() == null) {
+            return;
+        }
+        final int scrollAmount = tvLog.getLayout().getLineTop(tvLog.getLineCount()) - tvLog.getHeight();
+        // if there is no need to scroll, scrollAmount will be <=0
+        if (scrollAmount > 0)
+            tvLog.scrollTo(0, scrollAmount);
+        else
+            tvLog.scrollTo(0, 0);
     }
     
     @Override

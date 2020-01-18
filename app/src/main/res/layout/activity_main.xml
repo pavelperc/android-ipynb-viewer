@@ -6,10 +6,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     tools:context="com.pavelperc.ipynbViewer.MainActivity">
-    <com.termux.view.TerminalView
-        android:id="@+id/termLog"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"/>
+    
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -19,7 +16,8 @@
         android:textAppearance="@android:style/TextAppearance.Material.Display1" />
     
     <TextView
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:background="#ffe2e2e2"
         android:id="@+id/tvLog"
         android:layout_width="match_parent"
