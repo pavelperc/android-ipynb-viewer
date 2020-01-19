@@ -1,16 +1,23 @@
 package com.pavelperc.ipynbViewer;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 
 import com.termux.R;
 import com.termux.app.BackgroundJob;
 import com.termux.app.TermuxActivity;
 import com.termux.app.TermuxInstaller;
+import com.termux.terminal.TerminalBuffer;
 import com.termux.terminal.TerminalSession;
 
 import java.io.File;
@@ -23,6 +30,8 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
     
     TerminalSession session;
     TextView tvLog;
+    Button btnConvert;
+    TextView tvStatus;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,21 +39,21 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         setContentView(R.layout.activity_main);
         
         tvLog = findViewById(R.id.tvLog);
+        tvStatus = findViewById(R.id.tvStatus);
         tvLog.setMovementMethod(new ScrollingMovementMethod());
-    
         
+        btnConvert = findViewById(R.id.btnConvert);
+        btnConvert.setEnabled(false);
+        
+        ensureStoragePermissionGranted();
+    
+        tvStatus.setText("Unknown");
         
         TermuxInstaller.setupIfNeeded(this, () -> {
             session = createTermSession(null, null, null, false);
-            session.updateSize(50, 10);
+            session.updateSize(30, 10);
             session.reset();
-            
-            // ?????? not working
-            session.write("echo hello\n");
-            session.write("echo hello\n");
-            session.write("echo hello\n");
-            session.write("echo hello\n");
-            
+            session.write("echo HELLO\n");
         });
         
         
@@ -52,9 +61,62 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
             Intent intent = new Intent(this, TermuxActivity.class);
             startActivity(intent);
         });
-        findViewById(R.id.btnPrint).setOnClickListener(v -> {
-            session.write("echo hello\n");
+        
+        btnConvert.setOnClickListener(v -> {
+            tvStatus.setText("Converting");
+            btnConvert.setEnabled(false);
+            session.write("jupyter nbconvert ~/storage/shared/Download/ipynb/test.ipynb\n" +
+                "echo DONE_CONVERTING\n");
         });
+    }
+    
+    private void checkConverter() {
+        tvStatus.setText("Checking converter");
+        session.write("jupyter nbconvert --version\n");
+        session.write("echo DONE_CHECKING\n");
+    }
+    
+    // check after install
+    private void checkConverterAgain() {
+        tvStatus.setText("Checking converter");
+        session.write("jupyter nbconvert --version\n");
+        session.write("echo DONE_CHECKING_AGAIN\n");
+    }
+    
+    private boolean startedInstallingPython = false;
+    
+    private void loadPython() {
+        startedInstallingPython = true;
+        tvStatus.setText("Installing Python");
+        session.write("pkg install python\n");
+        session.write("Y\n");
+    }
+    
+    private void loadNBConvert() {
+//        session.write("termux-setup-storage\n");
+        tvStatus.setText("Installing nbconvert");
+        session.write("pip install nbconvert==" + NBCONVERT_VERSION + "\n");
+        session.write("echo DONE_LOADING\n");
+    }
+    
+    /**
+     * For processes to access shared internal storage (/sdcard) we need this permission.
+     */
+    public boolean ensureStoragePermissionGranted() {
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        } else {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+            return false;
+        }
+    }
+    
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+        if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            // OK
+            TermuxInstaller.setupStorageSymlinks(this);
+        }
     }
     
     
@@ -109,12 +171,55 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
     
     // TerminalSession.SessionChangedCallback:
     
+    private static String NBCONVERT_VERSION = "5.6.1";
+    
     @Override
     public void onTextChanged(TerminalSession changedSession) {
-        String text = changedSession.getEmulator().getScreen().getTranscriptText();
+        TerminalBuffer screen = changedSession.getEmulator().getScreen();
+        String text = screen.getTranscriptText();
         tvLog.setText(text);
-        
+        if (text.endsWith("HELLO\n$")) {
+            checkConverter();
+        } else if (text.endsWith("DONE_LOADING\n$")) {
+            checkConverterAgain();
+        } else if (text.endsWith("DONE_CONVERTING\n$")) {
+            tvStatus.setText("Done converting");
+            btnConvert.setEnabled(true);
+        } else if (text.endsWith("DONE_CHECKING\n$") || text.endsWith("DONE_CHECKING_AGAIN\n$")) {
+            String ending = text.substring(Math.max(0, text.length() - 100));
+            if (!ending.contains(NBCONVERT_VERSION)) {
+                
+                if (text.endsWith("DONE_CHECKING_AGAIN\n$")) {
+                    installFailureDialog(() -> loadPython());
+                } else {
+                    loadPython();
+                }
+            } else {
+                tvStatus.setText("Converter is ready");
+                btnConvert.setEnabled(true);
+            }
+        } else if (text.endsWith("$")) {
+            // No feedback after installing python.
+            if (startedInstallingPython) {
+                startedInstallingPython = false;
+                loadNBConvert();
+            } else {
+                tvStatus.setText("Some error. Restart the app.");
+            }
+            
+        }
         scrollLog();
+    }
+    
+    private void installFailureDialog(Runnable onSuccess) {
+        new AlertDialog.Builder(this)
+            .setTitle("Failed to install libraries.")
+            .setMessage("Try again?")
+            .setNegativeButton("No", null)
+            .setPositiveButton("Yes", (dialog, which) -> onSuccess.run())
+            .setCancelable(false)
+            .create()
+            .show();
     }
     
     private void scrollLog() {
@@ -131,7 +236,7 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
     
     @Override
     public void onTitleChanged(TerminalSession changedSession) {
-        Toast.makeText(this, "Title changed: " + changedSession.getTitle(), Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "Title changed: " + changedSession.getTitle(), Toast.LENGTH_SHORT).show();
     }
     
     @Override
@@ -151,7 +256,7 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
     
     @Override
     public void onColorsChanged(TerminalSession session) {
-        Toast.makeText(this, "On colors changed", Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "On colors changed", Toast.LENGTH_SHORT).show();
     }
     
     // ----- 

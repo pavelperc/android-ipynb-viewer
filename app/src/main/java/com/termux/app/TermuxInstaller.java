@@ -189,7 +189,7 @@ public final class TermuxInstaller {
         }
     }
 
-    static void setupStorageSymlinks(final Context context) {
+    public static void setupStorageSymlinks(final Context context) {
         final String LOG_TAG = "termux-storage";
         new Thread() {
             public void run() {

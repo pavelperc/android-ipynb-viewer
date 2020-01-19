@@ -5,35 +5,53 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    tools:context="com.pavelperc.ipynbViewer.MainActivity">
+    tools:context="com.pavelperc.ipynbViewer.MainActivity"
+    android:paddingTop="16dp">
+
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="Status: "
+        android:textAppearance="@android:style/TextAppearance.Material.Display1" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:textSize="20sp"
+        android:text="Updating" />
     
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginTop="16dp"
         android:text="Log:"
         android:textAppearance="@android:style/TextAppearance.Material.Display1" />
-    
+
     <TextView
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:background="#ffe2e2e2"
         android:id="@+id/tvLog"
         android:layout_width="match_parent"
         android:layout_height="200dp"
+        android:background="#ffe2e2e2"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:scrollbars="vertical" />
+
     <Button
         android:id="@+id/btnTermuxActivity"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Run termux window"
-        android:layout_gravity="center"/>
+        android:layout_gravity="center"
+        android:text="Run termux window" />
+
     <Button
-        android:id="@+id/btnPrint"
+        android:id="@+id/btnConvert"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Print hello"
-        android:layout_gravity="center"/>
+        android:layout_gravity="center"
+        android:text="Convert test" />
 
 </LinearLayout>
