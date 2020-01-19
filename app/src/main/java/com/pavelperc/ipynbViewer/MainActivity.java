@@ -197,7 +197,7 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         } else if (text.endsWith("DONE_CONVERTING\n$")) {
             tvStatus.setText("Done converting");
             btnConvert.setEnabled(true);
-            
+            Log.v("my_tag", "terminal output:\n" + text);
             openConvertedFile(new File(lastConvertedFilePath));
             
         } else if (text.endsWith("DONE_CHECKING\n$") || text.endsWith("DONE_CHECKING_AGAIN\n$")) {
@@ -311,6 +311,10 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         if (!wasSuccessful) {
             Toast.makeText(this, "Can not find file:\n" + Reason, Toast.LENGTH_LONG).show();
             return;
+        }
+        if (wasDriveFile) {
+            File tempFile = new File(path);
+            tempFile.renameTo(new File(tempFile.getParent(), tempFile.getName() + ".ipynb"));
         }
         Log.d("my_tag", "File path: " + path);
         convertFile(path);
