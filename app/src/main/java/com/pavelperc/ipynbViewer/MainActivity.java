@@ -5,9 +5,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.widget.Button;
@@ -27,6 +29,11 @@ import com.termux.terminal.TerminalBuffer;
 import com.termux.terminal.TerminalSession;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static com.termux.app.TermuxService.HOME_PATH;
 import static com.termux.app.TermuxService.PREFIX_PATH;
@@ -296,26 +303,86 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_PICKER_REQUEST_CODE);
     }
     
+    // https://stackoverflow.com/questions/5568874/how-to-extract-the-file-name-from-uri-returned-from-intent-action-get-content
+    private String getFileName(Uri uri) {
+        String result = null;
+        if (uri.getScheme().equals("content")) {
+            Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        if (result == null) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) {
+                result = result.substring(cut + 1);
+            }
+        }
+        if (!result.endsWith(".ipynb")) {
+            result = result + ".ipynb";
+        }
+        return result;
+    }
+    
     private Uri originalFileUri;
     
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_PICKER_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             Log.d("my_tag", "Original uri: " + data.getDataString());
+            originalFileUri = data.getData();
             pickiT.getPath(data.getData(), Build.VERSION.SDK_INT);
+        }
+    }
+    
+    private void saveFile(InputStream input, File file) {
+        try {
+            try (OutputStream output = new FileOutputStream(file)) {
+                byte[] buffer = new byte[40 * 1024]; // or other buffer size
+                int read;
+                
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                }
+            
+                output.flush();
+            }
+        } catch (Exception e) {
+        }finally {
+            try {
+                input.close();
+            } catch (IOException e) {
+            }
         }
     }
     
     @Override
     public void PickiTonCompleteListener(String path, boolean wasDriveFile, boolean wasUnknownProvider, boolean wasSuccessful, String Reason) {
         if (!wasSuccessful) {
-            Toast.makeText(this, "Can not find file:\n" + Reason, Toast.LENGTH_LONG).show();
-            return;
+            Log.d("my_tag", "not successful: " + Reason);
+            String name = getFileName(originalFileUri);
+            
+            File file = new File(getExternalCacheDir(), name);
+            try {
+                saveFile(getContentResolver().openInputStream(originalFileUri), file);
+            } catch (FileNotFoundException e) {
+                return;
+            }
+            path = file.getPath();
+        } 
+        else if (wasDriveFile) {
+            String name = getFileName(originalFileUri);
+            File newFile = new File(getExternalCacheDir(), name);
+            File oldFile = new File(path);
+            oldFile.renameTo(newFile);
+            path = newFile.getPath();
         }
-        if (wasDriveFile) {
-            File tempFile = new File(path);
-            tempFile.renameTo(new File(tempFile.getParent(), tempFile.getName() + ".ipynb"));
-        }
+        
         Log.d("my_tag", "File path: " + path);
         convertFile(path);
     }
