@@ -5,14 +5,20 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.FileProvider;
 
+import com.hbisoft.pickit.PickiT;
+import com.hbisoft.pickit.PickiTCallbacks;
 import com.termux.R;
 import com.termux.app.BackgroundJob;
 import com.termux.app.TermuxActivity;
@@ -26,17 +32,26 @@ import static com.termux.app.TermuxService.HOME_PATH;
 import static com.termux.app.TermuxService.PREFIX_PATH;
 
 
-public class MainActivity extends Activity implements TerminalSession.SessionChangedCallback {
+public class MainActivity extends Activity implements TerminalSession.SessionChangedCallback, PickiTCallbacks {
+    private static final int PERMISSION_STORAGE_REQUEST_CODE = 1;
+    private static final int FILE_PICKER_REQUEST_CODE = 2;
     
     TerminalSession session;
     TextView tvLog;
     Button btnConvert;
     TextView tvStatus;
     
+    PickiT pickiT;
+    
+    private String lastConvertedFilePath = "";
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        pickiT = new PickiT(this, this);
+        
+        TermuxInstaller.setupStorageSymlinks(this);
         
         tvLog = findViewById(R.id.tvLog);
         tvStatus = findViewById(R.id.tvStatus);
@@ -46,7 +61,7 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         btnConvert.setEnabled(false);
         
         ensureStoragePermissionGranted();
-    
+        
         tvStatus.setText("Unknown");
         
         TermuxInstaller.setupIfNeeded(this, () -> {
@@ -63,10 +78,7 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         });
         
         btnConvert.setOnClickListener(v -> {
-            tvStatus.setText("Converting");
-            btnConvert.setEnabled(false);
-            session.write("jupyter nbconvert ~/storage/shared/Download/ipynb/test.ipynb\n" +
-                "echo DONE_CONVERTING\n");
+            selectFile();
         });
     }
     
@@ -106,16 +118,16 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             return true;
         } else {
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_STORAGE_REQUEST_CODE);
             return false;
         }
     }
     
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
-        if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == PERMISSION_STORAGE_REQUEST_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             // OK
-            TermuxInstaller.setupStorageSymlinks(this);
+//            TermuxInstaller.setupStorageSymlinks(this);
         }
     }
     
@@ -162,16 +174,16 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
 //        updateNotification();
         
         // Make sure that terminal styling is always applied.
-        Intent stylingIntent = new Intent("com.termux.app.reload_style");
-        stylingIntent.putExtra("com.termux.app.reload_style", "styling");
-        sendBroadcast(stylingIntent);
+//        Intent stylingIntent = new Intent("com.termux.app.reload_style");
+//        stylingIntent.putExtra("com.termux.app.reload_style", "styling");
+//        sendBroadcast(stylingIntent);
         
         return session;
     }
     
-    // TerminalSession.SessionChangedCallback:
-    
     private static String NBCONVERT_VERSION = "5.6.1";
+    
+    // TerminalSession.SessionChangedCallback:
     
     @Override
     public void onTextChanged(TerminalSession changedSession) {
@@ -185,6 +197,9 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
         } else if (text.endsWith("DONE_CONVERTING\n$")) {
             tvStatus.setText("Done converting");
             btnConvert.setEnabled(true);
+            
+            openConvertedFile(new File(lastConvertedFilePath));
+            
         } else if (text.endsWith("DONE_CHECKING\n$") || text.endsWith("DONE_CHECKING_AGAIN\n$")) {
             String ending = text.substring(Math.max(0, text.length() - 100));
             if (!ending.contains(NBCONVERT_VERSION)) {
@@ -209,6 +224,20 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
             
         }
         scrollLog();
+    }
+    
+    private void openConvertedFile(File file) {
+        try {
+            Uri uri = FileProvider.getUriForFile(this, "com.pavelperc.ipynbViewer.fileprovider", file);
+//            Uri uri = Uri.fromFile(file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(uri);
+            intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+            
+        } catch (Exception e) {
+            Log.e("my_tag", "error", e);
+        }
     }
     
     private void installFailureDialog(Runnable onSuccess) {
@@ -259,8 +288,57 @@ public class MainActivity extends Activity implements TerminalSession.SessionCha
 //        Toast.makeText(this, "On colors changed", Toast.LENGTH_SHORT).show();
     }
     
-    // ----- 
+    private void selectFile() {
+        Intent intent = new Intent();
+        intent.setType("*/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        
+        startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_PICKER_REQUEST_CODE);
+    }
     
+    private Uri originalFileUri;
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_PICKER_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            Log.d("my_tag", "Original uri: " + data.getDataString());
+            pickiT.getPath(data.getData(), Build.VERSION.SDK_INT);
+        }
+    }
+    
+    @Override
+    public void PickiTonCompleteListener(String path, boolean wasDriveFile, boolean wasUnknownProvider, boolean wasSuccessful, String Reason) {
+        if (!wasSuccessful) {
+            Toast.makeText(this, "Can not find file:\n" + Reason, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Log.d("my_tag", "File path: " + path);
+        convertFile(path);
+    }
+    
+    private void convertFile(String path) {
+        tvStatus.setText("Converting");
+        btnConvert.setEnabled(false);
+        File file = new File(path);
+//        String fileName = file.getName() + "-" + file.lastModified() + ".html";
+        String fileName = file.getName() + ".html";
+        
+        session.write("jupyter nbconvert --output-dir=storage/temp --output=\"" + fileName + "\" \"" +
+            file.getAbsolutePath() + "\"\n" +
+            "echo DONE_CONVERTING\n");
+        
+        lastConvertedFilePath = getExternalCacheDir().getAbsolutePath() + "/" + fileName;
+        Log.d("my_tag", "see file in: " + lastConvertedFilePath);
+    }
+    
+    
+    @Override
+    public void PickiTonStartListener() {
+    }
+    
+    @Override
+    public void PickiTonProgressUpdate(int progress) {
+    }
     
     @Override
     protected void onDestroy() {

@@ -191,8 +191,8 @@ public final class TermuxInstaller {
 
     public static void setupStorageSymlinks(final Context context) {
         final String LOG_TAG = "termux-storage";
-        new Thread() {
-            public void run() {
+//        new Thread() {
+//            public void run() {
                 try {
                     File storageDir = new File(TermuxService.HOME_PATH, "storage");
 
@@ -211,8 +211,21 @@ public final class TermuxInstaller {
                     }
 
                     File sharedDir = Environment.getExternalStorageDirectory();
+                    Log.d("my_tag", "Internal dir!!!!: " + sharedDir.getAbsolutePath());
                     Os.symlink(sharedDir.getAbsolutePath(), new File(storageDir, "shared").getAbsolutePath());
-
+                    
+                    // add storage/emulated/0
+                    String emulated0 = sharedDir.getAbsolutePath().replace("/storage/", "");
+                    File sharedDirNew = new File(storageDir, emulated0);
+                    sharedDirNew.mkdirs();
+                    sharedDirNew.delete();
+                    Os.symlink(sharedDir.getAbsolutePath(), sharedDirNew.getAbsolutePath());
+                    
+                    // add temp
+                    File tempDir = context.getExternalCacheDir();
+                    Os.symlink(tempDir.getAbsolutePath(), new File(storageDir, "temp").getAbsolutePath());
+                    
+                    
                     File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                     Os.symlink(downloadsDir.getAbsolutePath(), new File(storageDir, "downloads").getAbsolutePath());
 
@@ -233,15 +246,22 @@ public final class TermuxInstaller {
                         for (int i = 1; i < dirs.length; i++) {
                             File dir = dirs[i];
                             if (dir == null) continue;
+                            Log.d("my_tag", "External dir!!!!: " + dir.getAbsolutePath());
+                            
+                            String sdCardPath = dir.getAbsolutePath()
+                                .replace("/Android/data/com.termux/files", "");
+                            String sdCardName = sdCardPath
+                                .replace("/storage/", "");
+                            
                             String symlinkName = "external-" + i;
                             Os.symlink(dir.getAbsolutePath(), new File(storageDir, symlinkName).getAbsolutePath());
+                            Os.symlink("/storage/" + sdCardName, new File(storageDir, sdCardName).getAbsolutePath());
                         }
                     }
                 } catch (Exception e) {
                     Log.e(LOG_TAG, "Error setting up link", e);
                 }
-            }
-        }.start();
+//            }
+//        }.start();
     }
-
 }
