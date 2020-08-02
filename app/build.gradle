@@ -1,6 +1,8 @@
 plugins {
   id "com.android.application"
 }
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
 
 android {
     compileSdkVersion 28
@@ -10,14 +12,16 @@ android {
         implementation "androidx.viewpager:viewpager:1.0.0"
         implementation "androidx.drawerlayout:drawerlayout:1.0.0"
         implementation project(":terminal-view")
+
+        implementation "org.jetbrains.anko:anko-commons:0.10.8"
     }
 
     defaultConfig {
         applicationId "com.termux"
         minSdkVersion 24
         targetSdkVersion 28
-        versionCode 88
-        versionName "0.88"
+        versionCode 1
+        versionName "1.0"
 
         externalNativeBuild {
             ndkBuild {
@@ -76,6 +80,7 @@ dependencies {
     
     // get file path from uri
     implementation 'com.github.HBiSoft:PickiT:0.1.8'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
 
 task versionName {
@@ -147,5 +152,8 @@ afterEvaluate {
   android.applicationVariants.all { variant ->
     variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
   }
+}
+repositories {
+    mavenCentral()
 }
 

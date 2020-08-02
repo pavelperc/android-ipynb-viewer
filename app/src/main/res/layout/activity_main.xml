@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    tools:context="com.pavelperc.ipynbViewer.MainActivity"
+    tools:context="com.flamingo.ipynbViewer.activity.MainActivity"
     android:paddingTop="16dp">
 
 

@@ -30,7 +30,7 @@
         <meta-data android:name="android.max_aspect" android:value="10.0" />
 
         <activity
-            android:name="com.pavelperc.ipynbViewer.MainActivity"
+            android:name="com.flamingo.ipynbViewer.activity.MainActivity"
             android:screenOrientation="portrait"
             >
             <intent-filter>
@@ -45,7 +45,7 @@
 
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.pavelperc.ipynbViewer.fileprovider"
+            android:authorities="com.flamingo.ipynbViewer.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
